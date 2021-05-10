@@ -271,10 +271,10 @@ class Rezero(layers.Layer):
 
 
 class ScaleNorm(layers.Layer):
-    def __init__(self, axis=-1, eps=1e-5, **kwargs):
+    def __init__(self, axis=-1, epsilon=1e-5):
         super().__init__()
         self.axis = axis
-        self.eps = eps
+        self.epsilon = epsilon
         self.g = self.add_weight(shape=(1, ), initializer='ones', name='g')
 
     def build(self, input_shape):
@@ -283,14 +283,14 @@ class ScaleNorm(layers.Layer):
 
     def call(self, x):
         norm = x.norm(axis=-1, keepdims=True) * self.scale
-        return x / norm.clamp(min=self.eps) * self.g
+        return x / norm.clamp(min=self.epsilon) * self.g
 
 
 class RMSNorm(layers.Layer):
-    def __init__(self, axis=-1, eps=1e-8, **kwargs):
+    def __init__(self, axis=-1, epsilon=1e-8):
         super().__init__()
         self.axis = axis
-        self.eps = eps
+        self.epsilon = epsilon
         self.g = self.add_weight(shape=(1, ), initializer='ones', name='g')
 
     def build(self, input_shape):
