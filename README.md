@@ -27,5 +27,12 @@ output = model(x, mask=mask)  # (1, 1024, 20000)
 print(output.shape)
 ```
 
+## Compare
+```python
+compare.ipynb
+mean difference tensor(5.0120e-07)
+max difference tensor(1.3351e-05)
+```
+
 ## Reference 
 https://github.com/lucidrains/x-transformers
