@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='tf-x-transformers',
     packages=find_packages(),
-    version='0.0.1',
+    version='0.0.2',
     license='MIT',
     description='TF-X-Transformers - TF2.x',
     author='Junn Yu',
