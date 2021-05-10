@@ -11,7 +11,7 @@ setup(
     url='https://github.com/junnyu/tf-x-transformers',
     keywords=[
         'artificial intelligence', 'attention mechanism', 'transformers'
-        'tf2.x'
+        'tensorflow 2.x'
     ],
     install_requires=[
         'tensorflow>=2.2', 'einops>=0.3', 'fastcore', 'tf_fast_api'
