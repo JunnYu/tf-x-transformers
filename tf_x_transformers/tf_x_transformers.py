@@ -326,7 +326,7 @@ class GEGLU(layers.Layer):
         self.proj = layers.Dense(dim_out * 2)
 
     def call(self, x):
-        x, gate = self.proj(x).chunk(2, dim=-1)
+        x, gate = self.proj(x).chunk(2, axis=-1)
         return x * gate.gleu()
 
 
