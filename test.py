@@ -1,16 +1,3 @@
-## tf-x-transformers
-[![PyPI version](https://badge.fury.io/py/tf-x-transformers.svg)](https://badge.fury.io/py/tf-x-transformers)
-
-tf2.0 version of x-transformers
-
-## Install
-```bash
-$ pip install tf-x-transformers
-```
-## Usage
-Encoder-only (BERT-like)
-
-```python
 import tensorflow as tf
 import tensorflow.experimental.numpy as tnp
 from tf_x_transformers import TransformerWrapper, Encoder
@@ -25,7 +12,3 @@ mask = tf.cast(tf.ones_like(x), dtype=tf.bool)
 output = model(x, mask=mask)  # (1, 1024, 20000)
 
 print(output.shape)
-```
-
-## Reference 
-https://github.com/lucidrains/x-transformers
