@@ -18,7 +18,7 @@ def top_p(logits, thres=0.9):
 # topk
 
 
-def top_k_tf(logits, thres=0.9):
+def top_k(logits, thres=0.9):
     k = int((1 - thres) * logits.size(-1))
     kth_logits = tf.sort(logits, direction="DESCENDING")[..., k - 1:k]
     return tf.where(logits >= kth_logits, logits, float("-inf"))
