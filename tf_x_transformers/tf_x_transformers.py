@@ -166,12 +166,14 @@ class FixedPositionalEmbedding(layers.Layer):
 class RelativePositionBias(layers.Layer):
     def __init__(
         self,
+        scale,
         causal=False,
         num_buckets=32,
         heads=8,
         max_distance=128,
     ):
         super().__init__()
+        self.scale = scale
         self.causal = causal
         self.num_buckets = num_buckets
         self.max_distance = max_distance
@@ -217,7 +219,7 @@ class RelativePositionBias(layers.Layer):
             max_distance=self.max_distance)
         values = self.relative_attention_bias(rel_bucket)
         bias = rearrange(values, 'i j h -> () h i j')
-        return qk_dots + bias
+        return qk_dots + (bias * self.scale)
 
 
 class RotaryEmbedding(layers.Layer):
@@ -225,13 +227,13 @@ class RotaryEmbedding(layers.Layer):
         super().__init__()
         self.dim = dim
 
-    def call(self, x, seq_dim=1):
+    def call(self, max_seq_len):
         inv_freq = 1. / (10000**(tf.range(0, self.dim, 2, dtype=K.floatx()) /
                                  self.dim))
-        t = tf.range(x.size(seq_dim), dtype=K.floatx())
+        t = tf.range(max_seq_len, dtype=K.floatx())
         freqs = tf.einsum('i , j -> i j', t, inv_freq)
         emb = tf.concat((freqs, freqs), axis=-1)
-        return emb[None, None, :, :]
+        return rearrange(emb, 'n d -> () () n d')
 
 
 def rotate_half(x):
@@ -239,10 +241,10 @@ def rotate_half(x):
     return tf.concat((-x2, x1), axis=-1)
 
 
-def apply_rotary_pos_emb(q, k, freqs):
-    q, k = map(lambda t: (t * freqs.cos()) + (rotate_half(t) * freqs.sin()),
-               (q, k))
-    return q, k
+def apply_rotary_pos_emb(t, freqs):
+    seq_len = t.size(-2)
+    freqs = freqs[:, :, -seq_len:]
+    return (t * freqs.cos()) + (rotate_half(t) * freqs.sin())
 
 
 # classes
@@ -417,7 +419,8 @@ class Attention(layers.Layer):
              rotary_pos_emb=None,
              prev_attn=None,
              mem=None):
-        b, n, _, h, talking_heads = *x.size(), self.heads, self.talking_heads
+        b, n, _, h, talking_heads, has_context = *x.size(
+        ), self.heads, self.talking_heads, exists(context)
         kv_input = default(context, x)
 
         q_input = x
@@ -441,11 +444,12 @@ class Attention(layers.Layer):
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h),
                       (q, k, v))
 
-        if exists(rotary_pos_emb):
+        if exists(rotary_pos_emb) and not has_context:
             l = rotary_pos_emb.size(-1)
             (ql, qr), (kl, kr) = map(lambda t: (t[..., :l], t[..., l:]),
                                      (q, k))
-            ql, kl = apply_rotary_pos_emb(ql, kl, rotary_pos_emb)
+            ql, kl = map(lambda t: apply_rotary_pos_emb(t, rotary_pos_emb),
+                         (ql, kl))
             q = tf.concat((ql, qr), axis=-1)
             k = tf.concat((kl, kr), axis=-1)
 
@@ -567,10 +571,11 @@ class AttentionLayers(layers.Layer):
 
         rotary_emb_dim = max(default(rotary_emb_dim, dim_head // 2), 32)
         self.rotary_pos_emb = RotaryEmbedding(
-            rotary_emb_dim) if rotary_pos_emb else always(None)
+            rotary_emb_dim) if rotary_pos_emb else None
 
         assert rel_pos_num_buckets <= rel_pos_max_distance, 'number of relative position buckets must be less than the relative position max distance'
         self.rel_pos = RelativePositionBias(
+            scale=dim_head**0.5,
             causal=causal,
             heads=heads,
             num_buckets=rel_pos_num_buckets,
@@ -662,7 +667,11 @@ class AttentionLayers(layers.Layer):
 
         mems = mems.copy() if exists(mems) else [None] * self.num_attn_layers
 
-        rotary_pos_emb = self.rotary_pos_emb(x)
+        rotary_pos_emb = None
+        if exists(self.rotary_pos_emb):
+            max_rotary_emb_length = max(*map(
+                lambda m: (m.size(1) if exists(m) else 0) + x.size(1), mems))
+            rotary_pos_emb = self.rotary_pos_emb(max_rotary_emb_length)
 
         for ind, (layer_type, (norm, block, residual_fn)) in enumerate(
                 zip(self.layer_types, self.tf_layers)):
