@@ -2,8 +2,8 @@ from setuptools import setup, find_packages
 
 setup(
     name='tf-x-transformers',
-    packages=find_packages(),
-    version='0.0.2',
+    packages=find_packages(exclude=("compare", )),
+    version='0.0.4',
     license='MIT',
     description='TF-X-Transformers - TF2.x',
     author='Junn Yu',

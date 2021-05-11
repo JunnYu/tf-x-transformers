@@ -29,7 +29,7 @@ print(output.shape)
 
 ## Compare
 ```python
-compare.ipynb
+compare/Encoder_compare.ipynb
 mean difference tensor(5.0120e-07)
 max difference tensor(1.3351e-05)
 ```

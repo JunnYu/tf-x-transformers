@@ -1,5 +1,6 @@
 from tf_fast_api import *
 from tf_x_transformers.tf_entmax import entmax15
+from tf_x_transformers.autoregressive_wrapper import AutoregressiveWrapper
 import math
 from functools import partial
 from inspect import isfunction
@@ -257,8 +258,8 @@ class Scale(layers.Layer):
         self.fn = fn
 
     def call(self, x, **kwargs):
-        x = self.fn(x, **kwargs)
-        return x * self.value
+        x, *rest = self.fn(x, **kwargs)
+        return (x * self.value, *rest)
 
 
 class Rezero(layers.Layer):
@@ -959,4 +960,50 @@ class ContinuousTransformerWrapper(layers.Layer):
                     intermediates.attn_intermediates))
             return out, attn_maps
 
+        return out
+
+
+class XTransformer(layers.Layer):
+    def __init__(self, *, dim, tie_token_emb=False, **kwargs):
+        super().__init__()
+        enc_kwargs, kwargs = groupby_prefix_and_trim('enc_', kwargs)
+        dec_kwargs, kwargs = groupby_prefix_and_trim('dec_', kwargs)
+
+        assert 'dim' not in enc_kwargs and 'dim' not in dec_kwargs, 'dimension of either encoder or decoder must be set with `dim` keyword'
+        enc_transformer_kwargs = pick_and_pop(['num_tokens', 'max_seq_len'],
+                                              enc_kwargs)
+        enc_transformer_kwargs['num_memory_tokens'] = enc_kwargs.pop(
+            'num_memory_tokens', None)
+
+        dec_transformer_kwargs = pick_and_pop(['num_tokens', 'max_seq_len'],
+                                              dec_kwargs)
+
+        self.encoder = TransformerWrapper(**enc_transformer_kwargs,
+                                          attn_layers=Encoder(dim=dim,
+                                                              **enc_kwargs))
+
+        self.decoder = TransformerWrapper(**dec_transformer_kwargs,
+                                          attn_layers=Decoder(
+                                              dim=dim,
+                                              cross_attend=True,
+                                              **dec_kwargs))
+
+        if tie_token_emb:
+            self.decoder.token_emb = self.encoder.token_emb
+
+        self.decoder = AutoregressiveWrapper(self.decoder)
+
+    def generate(self, seq_in, seq_out_start, seq_len, src_mask=None):
+        encodings = self.encoder(seq_in, return_embeddings=True, mask=src_mask)
+        return self.decoder.generate(seq_out_start,
+                                     seq_len,
+                                     context=encodings,
+                                     context_mask=src_mask)
+
+    def call(self, src, tgt, src_mask=None, tgt_mask=None):
+        enc = self.encoder(src, mask=src_mask, return_embeddings=True)
+        out = self.decoder(tgt,
+                           context=enc,
+                           mask=tgt_mask,
+                           context_mask=src_mask)
         return out
