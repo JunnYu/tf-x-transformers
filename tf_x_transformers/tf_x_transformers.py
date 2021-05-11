@@ -330,7 +330,7 @@ class GEGLU(layers.Layer):
 
     def call(self, x):
         x, gate = self.proj(x).chunk(2, axis=-1)
-        return x * gate.gleu()
+        return x * tf.nn.gelu(gate)
 
 
 class FeedForward(layers.Layer):
