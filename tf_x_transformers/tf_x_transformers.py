@@ -192,7 +192,7 @@ class RelativePositionBias(layers.Layer):
             ret += (n < 0).astype(n.dtype) * num_buckets
             n = n.abs()
         else:
-            n = n.clamp(min=0)  #tf.maximum(n, tf.zeros_like(n))
+            n = n.clamp(min=0)  # tf.maximum(n, tf.zeros_like(n))
 
         max_exact = num_buckets // 2
 
@@ -447,12 +447,12 @@ class Attention(layers.Layer):
 
         if exists(rotary_pos_emb) and not has_context:
             l = rotary_pos_emb.size(-1)
-            (ql, qr), (kl, kr) = map(lambda t: (t[..., :l], t[..., l:]),
-                                     (q, k))
+            (ql, qr), (kl, kr), (vl, vr) = map(
+                lambda t: (t[..., :l], t[..., l:]), (q, k, v))
             ql, kl = map(lambda t: apply_rotary_pos_emb(t, rotary_pos_emb),
                          (ql, kl))
-            q = tf.concat((ql, qr), axis=-1)
-            k = tf.concat((kl, kr), axis=-1)
+            q, k, v = map(lambda t: tf.concat(t, axis=-1),
+                          ((ql, qr), (kl, kr), (vl, vr)))
 
         input_mask = None
         if any(map(exists, (mask, context_mask))):
@@ -611,7 +611,8 @@ class AttentionLayers(layers.Layer):
             assert 1 < par_ratio <= par_depth, 'par ratio out of range'
             default_block = tuple(filter(not_equals('f'), default_block))
             par_attn = par_depth // par_ratio
-            depth_cut = par_depth * 2 // 3  # 2 / 3 attention layer cutoff suggested by PAR paper
+            # 2 / 3 attention layer cutoff suggested by PAR paper
+            depth_cut = par_depth * 2 // 3
             par_width = (depth_cut + depth_cut // par_attn) // par_attn
             assert len(
                 default_block
@@ -670,8 +671,8 @@ class AttentionLayers(layers.Layer):
 
         rotary_pos_emb = None
         if exists(self.rotary_pos_emb):
-            max_rotary_emb_length = max(*map(
-                lambda m: (m.size(1) if exists(m) else 0) + x.size(1), mems))
+            max_rotary_emb_length = max(list(map(
+                lambda m: (m.size(1) if exists(m) else 0) + x.size(1), mems)))
             rotary_pos_emb = self.rotary_pos_emb(max_rotary_emb_length)
 
         for ind, (layer_type, (norm, block, residual_fn)) in enumerate(

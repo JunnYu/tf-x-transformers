@@ -1,7 +1,7 @@
 from tf_fast_api import *
 from tf_x_transformers.tf_entmax import entmax15
 
-entmax = entmax15  #TODO entmax_beisect
+entmax = entmax15  # TODO entmax_beisect
 # nucleus
 
 
